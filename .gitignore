@@ -1,6 +1,31 @@
+# dependencies
 node_modules
+
+# next.js
 .next
+apps/web/.next
+
+# expo / react native
+.expo
+apps/mobile/.expo
+apps/mobile/ios
+apps/mobile/android
+apps/mobile/dist
+
+# turborepo
+.turbo
+
+# env
 .env
 .env.local
+.env*.local
+
+# vercel
 .vercel
+
+# misc
 *.log
+*.tsbuildinfo
+
+# docs
+docs/

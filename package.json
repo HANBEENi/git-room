@@ -2,25 +2,15 @@
   "name": "git-room",
   "version": "0.1.0",
   "private": true,
-  "description": "커밋을 안 하면 방이 더러워지는 GitHub 잔디 시각화 서비스 — README 위젯 + 웹 대시보드",
+  "description": "커밋을 안 하면 방이 더러워지는 GitHub 잔디 시각화 서비스 — 웹 대시보드 + 모바일 앱",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  },
-  "dependencies": {
-    "@google/genai": "^0.15.0",
-    "next": "14.2.5",
-    "next-auth": "^4.24.7",
-    "octokit": "^4.0.2",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint"
   },
   "devDependencies": {
-    "@types/node": "^20.14.9",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
+    "turbo": "^2.10.9",
     "typescript": "^5.5.3"
-  }
+  },
+  "packageManager": "pnpm@10.33.0"
 }
