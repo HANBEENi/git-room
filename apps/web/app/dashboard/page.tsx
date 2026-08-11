@@ -15,7 +15,9 @@ export default async function Dashboard() {
     redirect("/");
   }
 
-  const { daysSinceLastCommit, currentStreak } = await fetchViewerContributions(session.accessToken);
+  const { daysSinceLastCommit, currentStreak } = await fetchViewerContributions(
+    session.accessToken,
+  );
   const { svg, room } = renderRoomSVG({
     username: session.login,
     daysSinceLastCommit,

@@ -1,16 +1,16 @@
-import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, TextInput } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { SvgXml } from 'react-native-svg';
+import { useState } from "react";
+import { ActivityIndicator, StyleSheet, TextInput } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { SvgXml } from "react-native-svg";
 
-import { fetchPublicContributions, renderRoomSVG } from '@git-room/shared';
+import { fetchPublicContributions, renderRoomSVG } from "@git-room/shared";
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing, MaxContentWidth } from '@/constants/theme';
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { Spacing, MaxContentWidth } from "@/constants/theme";
 
 export default function HomeScreen() {
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState("");
   const [svg, setSvg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +26,7 @@ export default function HomeScreen() {
       const { svg } = renderRoomSVG({ username: trimmed, daysSinceLastCommit, currentStreak });
       setSvg(svg);
     } catch {
-      setError('방 상태를 불러오지 못했어요. GitHub 유저네임을 확인해주세요.');
+      setError("방 상태를 불러오지 못했어요. GitHub 유저네임을 확인해주세요.");
       setSvg(null);
     } finally {
       setLoading(false);
@@ -73,36 +73,36 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
   },
   safeArea: {
     flex: 1,
-    width: '100%',
+    width: "100%",
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.six,
-    alignItems: 'center',
+    alignItems: "center",
     gap: Spacing.three,
     maxWidth: MaxContentWidth,
   },
   title: {
-    textAlign: 'center',
+    textAlign: "center",
   },
   subtitle: {
-    textAlign: 'center',
+    textAlign: "center",
   },
   input: {
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     borderWidth: 1,
-    borderColor: '#8884',
+    borderColor: "#8884",
     borderRadius: Spacing.two,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     fontSize: 16,
   },
   roomCard: {
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     borderRadius: Spacing.three,
-    overflow: 'hidden',
+    overflow: "hidden",
     padding: Spacing.two,
   },
 });

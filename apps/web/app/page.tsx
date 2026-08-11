@@ -14,8 +14,8 @@ export default async function Home() {
 
       <div className="card" style={{ marginBottom: 20 }}>
         <p style={{ marginTop: 0 }}>
-          잔디를 안 심은 기간에 비례해서 방에 쓰레기와 먼지, 거미줄이 쌓여요.
-          매일 커밋 한 번으로 방을 깨끗하게 유지해보세요.
+          잔디를 안 심은 기간에 비례해서 방에 쓰레기와 먼지, 거미줄이 쌓여요. 매일 커밋 한 번으로
+          방을 깨끗하게 유지해보세요.
         </p>
         <div className="row">
           {session ? (

@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 
-export default function CreateRepoButton({ hasRepo, repoUrl }: { hasRepo: boolean; repoUrl: string }) {
+export default function CreateRepoButton({
+  hasRepo,
+  repoUrl,
+}: {
+  hasRepo: boolean;
+  repoUrl: string;
+}) {
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [url, setUrl] = useState(repoUrl);

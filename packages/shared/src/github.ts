@@ -25,7 +25,11 @@ export async function ensureTilRepo(octokit: Octokit, login: string) {
   // 최초 README 형태를 TIL 로그용으로 세팅
   const initial = `# 📚 my-daily-learning\n\nGit-Room이 관리하는 TIL(Today I Learned) 기록 레포입니다.\n매일 한 줄씩 배운 것을 남기면 [Git-Room](https://github.com/${login}) 방이 깨끗하게 유지돼요.\n\n---\n\n## Log\n`;
 
-  const readme = await octokit.rest.repos.getContent({ owner: login, repo: TIL_REPO_NAME, path: "README.md" });
+  const readme = await octokit.rest.repos.getContent({
+    owner: login,
+    repo: TIL_REPO_NAME,
+    path: "README.md",
+  });
   const sha = Array.isArray(readme.data) ? undefined : (readme.data as any).sha;
 
   await octokit.rest.repos.createOrUpdateFileContents({
@@ -109,7 +113,7 @@ export async function commitTilDoc(
   login: string,
   path: string,
   content: string,
-  message: string
+  message: string,
 ) {
   await octokit.rest.repos.createOrUpdateFileContents({
     owner: login,

@@ -28,11 +28,49 @@ export function getRoomState(daysSinceLastCommit: number): RoomState {
 }
 
 // 벽/바닥 톤은 단계별로 점점 어두워진다.
-const PALETTE: Record<RoomStage, { wall: string; wallShade: string; floor: string; floorShade: string; window: string; glow: string }> = {
-  clean: { wall: "#fdeedc", wallShade: "#f6dcc0", floor: "#c98a54", floorShade: "#b97940", window: "#bfe8ff", glow: "#fff6d8" },
-  light: { wall: "#f0e2cf", wallShade: "#e3cfb2", floor: "#b97e4c", floorShade: "#a76d3d", window: "#a9cfe0", glow: "#fdf0c8" },
-  moderate: { wall: "#ddccb8", wallShade: "#c9b598", floor: "#9c7145", floorShade: "#8a6138", window: "#8fb2c2", glow: "#e9dcac" },
-  neglected: { wall: "#4a4640", wallShade: "#3a3730", floor: "#3f3226", floorShade: "#332821", window: "#3c4a52", glow: "#5c5748" },
+const PALETTE: Record<
+  RoomStage,
+  {
+    wall: string;
+    wallShade: string;
+    floor: string;
+    floorShade: string;
+    window: string;
+    glow: string;
+  }
+> = {
+  clean: {
+    wall: "#fdeedc",
+    wallShade: "#f6dcc0",
+    floor: "#c98a54",
+    floorShade: "#b97940",
+    window: "#bfe8ff",
+    glow: "#fff6d8",
+  },
+  light: {
+    wall: "#f0e2cf",
+    wallShade: "#e3cfb2",
+    floor: "#b97e4c",
+    floorShade: "#a76d3d",
+    window: "#a9cfe0",
+    glow: "#fdf0c8",
+  },
+  moderate: {
+    wall: "#ddccb8",
+    wallShade: "#c9b598",
+    floor: "#9c7145",
+    floorShade: "#8a6138",
+    window: "#8fb2c2",
+    glow: "#e9dcac",
+  },
+  neglected: {
+    wall: "#4a4640",
+    wallShade: "#3a3730",
+    floor: "#3f3226",
+    floorShade: "#332821",
+    window: "#3c4a52",
+    glow: "#5c5748",
+  },
 };
 
 function crumpledPaper(x: number, y: number, rotate: number) {
@@ -85,7 +123,11 @@ function sparkle(x: number, y: number) {
   return `<path transform="translate(${x} ${y})" d="M6 0 L7.5 4.5 L12 6 L7.5 7.5 L6 12 L4.5 7.5 L0 6 L4.5 4.5 Z" fill="#ffe9a8"/>`;
 }
 
-export function renderRoomSVG(opts: { username?: string; daysSinceLastCommit: number; currentStreak?: number }) {
+export function renderRoomSVG(opts: {
+  username?: string;
+  daysSinceLastCommit: number;
+  currentStreak?: number;
+}) {
   const days = Math.max(0, Math.floor(opts.daysSinceLastCommit));
   const room = getRoomState(days);
   const p = PALETTE[room.stage];

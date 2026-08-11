@@ -1,4 +1,12 @@
-export default function RoomView({ svg, label, days }: { svg: string; label: string; days: number }) {
+export default function RoomView({
+  svg,
+  label,
+  days,
+}: {
+  svg: string;
+  label: string;
+  days: number;
+}) {
   return (
     <div>
       <div className="room-frame" dangerouslySetInnerHTML={{ __html: svg }} />
