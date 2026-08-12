@@ -45,5 +45,8 @@ body:
     id: extra
     attributes:
       label: 추가 정보 (스크린샷, 로그 등)
+      description: >
+        이 이슈는 누구나 볼 수 있는 공개 게시물입니다. 업로드 전에 토큰, 비밀번호,
+        개인정보 등 민감한 정보가 포함되어 있지 않은지 확인해주세요.
     validations:
       required: false
