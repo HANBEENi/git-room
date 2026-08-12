@@ -14,3 +14,7 @@ reviews:
 
 chat:
   auto_reply: true
+
+pre_merge_checks:
+  docstrings:
+    mode: off
