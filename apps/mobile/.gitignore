@@ -7,7 +7,7 @@ node_modules/
 .expo/
 dist/
 web-build/
-expo-env.d.ts
+# expo-env.d.ts는 내용이 고정이라 예외적으로 커밋함 (CI 타입체크 안정성)
 
 # Native
 .kotlin/
