@@ -9,7 +9,7 @@
     "./github": "./src/github.ts"
   },
   "dependencies": {
-    "octokit": "^4.0.2"
+    "octokit": "^5.0.5"
   },
   "devDependencies": {
     "@types/node": "^20.14.9",
