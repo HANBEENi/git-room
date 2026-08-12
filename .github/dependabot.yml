@@ -9,6 +9,16 @@ updates:
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      # apps/web은 React 18, apps/mobile은 React 19를 의도적으로 분리해서 쓰고 있어서,
+      # Dependabot이 이 둘을 부분적으로만 건드리면 pnpm 해석이 꼬여 버전 불일치 크래시가 남.
+      # 업그레이드는 항상 수동으로, 양쪽 다 확인하며 진행.
+      - dependency-name: "react"
+      - dependency-name: "react-dom"
+      # next lint(Next.js 14)는 ESLint 8 기준 옵션(useEslintrc 등)에 의존하는데,
+      # ESLint 9/10(flat config 전용)로 메이저 업그레이드하면 그 옵션들이 제거되어 깨짐.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "📦️ Chore"
 
