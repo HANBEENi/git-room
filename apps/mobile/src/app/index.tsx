@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ActivityIndicator, StyleSheet, TextInput } from "react-native";
+import { useRef, useState } from "react";
+import { ActivityIndicator, Platform, StyleSheet, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SvgXml } from "react-native-svg";
 
@@ -14,22 +14,39 @@ export default function HomeScreen() {
   const [svg, setSvg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
 
   async function handleCheck() {
     const trimmed = username.trim();
     if (!trimmed) return;
 
+    // GitHub 응답에는 CORS 허용 헤더가 없어서 웹(react-native-web) 빌드에서는 직접 fetch가
+    // 항상 실패한다. 이 프로젝트는 RN 웹 빌드를 쓰지 않기로 했지만, 실수로 실행되더라도
+    // 원인 모를 네트워크 에러 대신 명확한 안내를 보여준다.
+    if (Platform.OS === "web") {
+      setError("이 기능은 iOS/Android 앱에서만 지원돼요.");
+      setSvg(null);
+      return;
+    }
+
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
     try {
       const { daysSinceLastCommit, currentStreak } = await fetchPublicContributions(trimmed);
       const { svg } = renderRoomSVG({ username: trimmed, daysSinceLastCommit, currentStreak });
-      setSvg(svg);
+      if (requestIdRef.current === requestId) {
+        setSvg(svg);
+      }
     } catch {
-      setError("방 상태를 불러오지 못했어요. GitHub 유저네임을 확인해주세요.");
-      setSvg(null);
+      if (requestIdRef.current === requestId) {
+        setError("방 상태를 불러오지 못했어요. GitHub 유저네임을 확인해주세요.");
+        setSvg(null);
+      }
     } finally {
-      setLoading(false);
+      if (requestIdRef.current === requestId) {
+        setLoading(false);
+      }
     }
   }
 
