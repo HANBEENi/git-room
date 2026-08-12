@@ -1,9 +1,12 @@
 // lib/room-svg.ts
-// 방치(미커밋) 일수에 따라 4단계로 변하는 픽셀아트풍 "내 방" SVG 렌더러.
-// 0일: 깨끗한 방(햇살/반짝임)
-// 1~2일: 구겨진 종이 1~2장, 조명 어두워짐
-// 3~5일: 쓰레기봉투 + 얇은 먼지
-// 7일+ : 거미줄 + 꽉 찬 쓰레기통 + 어두운 방 + 연기
+// 방치(미커밋) 일수에 따라 13단계로 변하는 픽셀아트풍 "내 방" SVG 렌더러.
+// 00 0일: 깨끗한 방          07 26~29일: 빛이 안 드는 방
+// 01 1~2일: 종이 굴러다님    08 30~39일: 버려진 방
+// 02 3~6일: 쓰레기+먼지      09 40~89일: 금이 간 방
+// 03 7~10일: 거미줄+쓰레기통 10 3개월~: 화분이 시든 방
+// 04 11~15일: 옷가지 널브러짐 11 6개월~: 폐허가 된 방
+// 05 16~19일: 날파리         12 1년~: 화면 전체 쓰레기로 뒤덮임
+// 06 20~25일: 곰팡이+조명 깜빡
 
 // 사용자 입력(username)이 SVG <text> 노드에 그대로 들어가므로 XML 특수문자를 escape.
 // (/api/room?user= 는 인증 없이 임의 문자열을 그대로 받는 공개 엔드포인트)
@@ -16,40 +19,84 @@ function escapeXml(value: string): string {
     .replace(/'/g, "&apos;");
 }
 
-export type RoomStage = "clean" | "light" | "moderate" | "neglected";
+export type RoomStage =
+  | "clean"
+  | "light"
+  | "moderate"
+  | "neglected"
+  | "cluttered"
+  | "infested"
+  | "moldy"
+  | "gloomy"
+  | "abandoned"
+  | "cracked"
+  | "withered"
+  | "ruined"
+  | "wasteland";
+
+interface StageDef {
+  stage: RoomStage;
+  minDays: number;
+  label: string;
+  emoji: string;
+}
+
+// 순서대로 정의, minDays 이상이면 그 단계로 판정 (아래 STAGES 배열의 인덱스가 곧 stageIndex)
+const STAGES: StageDef[] = [
+  { stage: "clean", minDays: 0, label: "깨끗한 방", emoji: "✨" },
+  { stage: "light", minDays: 1, label: "종이가 굴러다니는 방", emoji: "📄" },
+  { stage: "moderate", minDays: 3, label: "쓰레기가 쌓이는 방", emoji: "🧹" },
+  { stage: "neglected", minDays: 7, label: "거미줄 낀 방", emoji: "🕸️" },
+  { stage: "cluttered", minDays: 11, label: "옷가지가 널브러진 방", emoji: "👕" },
+  { stage: "infested", minDays: 16, label: "날파리 꼬인 방", emoji: "🪰" },
+  { stage: "moldy", minDays: 20, label: "곰팡이 핀 방", emoji: "🦠" },
+  { stage: "gloomy", minDays: 26, label: "빛이 안 드는 방", emoji: "🌑" },
+  { stage: "abandoned", minDays: 30, label: "버려진 방", emoji: "📦" },
+  { stage: "cracked", minDays: 40, label: "금이 간 방", emoji: "🧱" },
+  { stage: "withered", minDays: 90, label: "화분이 시든 방", emoji: "🥀" },
+  { stage: "ruined", minDays: 180, label: "폐허가 된 방", emoji: "🏚️" },
+  { stage: "wasteland", minDays: 365, label: "쓰레기로 뒤덮인 방", emoji: "💀" },
+];
 
 export interface RoomState {
   stage: RoomStage;
+  stageIndex: number;
   daysSinceLastCommit: number;
   label: string;
   emoji: string;
 }
 
 export function getRoomState(daysSinceLastCommit: number): RoomState {
-  if (daysSinceLastCommit <= 0) {
-    return { stage: "clean", daysSinceLastCommit, label: "깨끗한 방", emoji: "✨" };
+  const days = Math.max(0, Math.floor(daysSinceLastCommit));
+
+  let index = 0;
+  for (let i = 0; i < STAGES.length; i++) {
+    if (days >= STAGES[i].minDays) index = i;
   }
-  if (daysSinceLastCommit <= 2) {
-    return { stage: "light", daysSinceLastCommit, label: "종이가 굴러다니는 방", emoji: "📄" };
-  }
-  if (daysSinceLastCommit <= 6) {
-    return { stage: "moderate", daysSinceLastCommit, label: "쓰레기가 쌓이는 방", emoji: "🧹" };
-  }
-  return { stage: "neglected", daysSinceLastCommit, label: "거미줄 낀 방", emoji: "🕸️" };
+
+  const def = STAGES[index];
+  return {
+    stage: def.stage,
+    stageIndex: index,
+    daysSinceLastCommit: days,
+    label: def.label,
+    emoji: def.emoji,
+  };
 }
 
-// 벽/바닥 톤은 단계별로 점점 어두워진다.
-const PALETTE: Record<
-  RoomStage,
-  {
-    wall: string;
-    wallShade: string;
-    floor: string;
-    floorShade: string;
-    window: string;
-    glow: string;
-  }
-> = {
+interface Palette {
+  wall: string;
+  wallShade: string;
+  floor: string;
+  floorShade: string;
+  window: string;
+  glow: string;
+}
+
+// 0~3단계(clean~neglected)는 손으로 고른 색, 4단계(cluttered) 이후는 neglected 색에서
+// wasteland 색까지 선형 보간한다 — 13단계를 전부 손으로 고르면 색 톤이 들쭉날쭉해지기 쉬워서,
+// 두 끝점만 정해두고 계산으로 채운다.
+const BASE_PALETTE: Record<"clean" | "light" | "moderate" | "neglected", Palette> = {
   clean: {
     wall: "#fdeedc",
     wallShade: "#f6dcc0",
@@ -84,6 +131,53 @@ const PALETTE: Record<
   },
 };
 
+const WASTELAND_PALETTE: Palette = {
+  wall: "#0e0c0b",
+  wallShade: "#080706",
+  floor: "#080503",
+  floorShade: "#040302",
+  window: "#0d1014",
+  glow: "#161310",
+};
+
+function mixHex(a: string, b: string, t: number): string {
+  const pa = parseInt(a.slice(1), 16);
+  const pb = parseInt(b.slice(1), 16);
+  const channel = (shift: number) => {
+    const av = (pa >> shift) & 0xff;
+    const bv = (pb >> shift) & 0xff;
+    return Math.round(av + (bv - av) * t);
+  };
+  const rgb = [channel(16), channel(8), channel(0)];
+  return `#${rgb.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function getPalette(stageIndex: number): Palette {
+  if (stageIndex === 0) return BASE_PALETTE.clean;
+  if (stageIndex === 1) return BASE_PALETTE.light;
+  if (stageIndex === 2) return BASE_PALETTE.moderate;
+  if (stageIndex === 3) return BASE_PALETTE.neglected;
+
+  const t = (stageIndex - 3) / (STAGES.length - 1 - 3);
+  const from = BASE_PALETTE.neglected;
+  const to = WASTELAND_PALETTE;
+  return {
+    wall: mixHex(from.wall, to.wall, t),
+    wallShade: mixHex(from.wallShade, to.wallShade, t),
+    floor: mixHex(from.floor, to.floor, t),
+    floorShade: mixHex(from.floorShade, to.floorShade, t),
+    window: mixHex(from.window, to.window, t),
+    glow: mixHex(from.glow, to.glow, t),
+  };
+}
+
+// 단계가 깊어질수록 창문 조명은 어두워지고, 먼지/암전 레이어는 짙어진다.
+const WINDOW_GLOW_OPACITY = [
+  0.9, 0.5, 0.28, 0.22, 0.18, 0.15, 0.12, 0.1, 0.08, 0.07, 0.06, 0.05, 0.04,
+];
+const DUST_OPACITY = [0, 0, 0.1, 0.16, 0.19, 0.21, 0.24, 0.28, 0.32, 0.36, 0.4, 0.45, 0.52];
+const DARK_OVERLAY_OPACITY = [0, 0, 0, 0.28, 0.32, 0.36, 0.4, 0.46, 0.52, 0.56, 0.6, 0.66, 0.72];
+
 function crumpledPaper(x: number, y: number, rotate: number) {
   return `<g transform="translate(${x} ${y}) rotate(${rotate})">
     <path d="M0 8 L6 0 L14 2 L18 10 L12 16 L2 14 Z" fill="#f5f1e6" stroke="#d8d0bd" stroke-width="1"/>
@@ -103,9 +197,9 @@ function dustLayer(opacity: number) {
   return `<rect x="0" y="0" width="320" height="220" fill="#8a7a5c" opacity="${opacity}" style="mix-blend-mode:multiply"/>`;
 }
 
-function cobweb(x: number, y: number, flip = false) {
+function cobweb(x: number, y: number, flip = false, scale = 1) {
   const s = flip ? -1 : 1;
-  return `<g transform="translate(${x} ${y}) scale(${s} 1)" stroke="#e8e8e8" stroke-width="1" fill="none" opacity="0.85">
+  return `<g transform="translate(${x} ${y}) scale(${s * scale} ${scale})" stroke="#e8e8e8" stroke-width="1" fill="none" opacity="0.85">
     <path d="M0 0 L34 0 M0 0 L0 34 M0 0 L28 28"/>
     <path d="M0 8 Q10 8 8 0"/>
     <path d="M0 18 Q17 18 18 0"/>
@@ -134,6 +228,49 @@ function sparkle(x: number, y: number) {
   return `<path transform="translate(${x} ${y})" d="M6 0 L7.5 4.5 L12 6 L7.5 7.5 L6 12 L4.5 7.5 L0 6 L4.5 4.5 Z" fill="#ffe9a8"/>`;
 }
 
+function clothesPile(x: number, y: number) {
+  return `<g transform="translate(${x} ${y})">
+    <ellipse cx="14" cy="18" rx="16" ry="5" fill="#00000022"/>
+    <path d="M0 14 Q4 2 16 4 Q26 6 24 16 Q14 22 0 14 Z" fill="#6b4f5e"/>
+    <path d="M4 12 Q10 8 18 10" stroke="#523c48" stroke-width="2" fill="none"/>
+  </g>`;
+}
+
+function fly(x: number, y: number) {
+  return `<g transform="translate(${x} ${y})" opacity="0.8">
+    <circle r="1.6" fill="#1c1c1c"/>
+    <path d="M-4 -3 Q0 0 -4 3" stroke="#1c1c1c" stroke-width="0.6" fill="none"/>
+    <path d="M4 -3 Q0 0 4 3" stroke="#1c1c1c" stroke-width="0.6" fill="none"/>
+  </g>`;
+}
+
+function moldSpot(x: number, y: number, scale = 1) {
+  return `<g transform="translate(${x} ${y}) scale(${scale})" opacity="0.55">
+    <ellipse cx="0" cy="0" rx="10" ry="6" fill="#4b5a3a"/>
+    <ellipse cx="7" cy="3" rx="5" ry="4" fill="#3c4a2e"/>
+    <ellipse cx="-5" cy="4" rx="4" ry="3" fill="#3c4a2e"/>
+  </g>`;
+}
+
+function crack(x: number, y: number) {
+  return `<path transform="translate(${x} ${y})" d="M0 0 L4 10 L-2 18 L5 30 L0 42" stroke="#000000" stroke-width="1.2" fill="none" opacity="0.5"/>`;
+}
+
+function witheredPlant(x: number, y: number) {
+  return `<g transform="translate(${x} ${y})">
+    <path d="M4 34 L20 34 L18 20 L6 20 Z" fill="#8a5a3c"/>
+    <path d="M12 20 Q6 10 8 0" stroke="#6b5a3a" stroke-width="2" fill="none"/>
+    <path d="M12 20 Q18 8 14 -2" stroke="#6b5a3a" stroke-width="2" fill="none"/>
+    <path d="M12 18 Q10 6 4 4" stroke="#7a6540" stroke-width="1.5" fill="none"/>
+    <ellipse cx="8" cy="-1" rx="4" ry="2" fill="#7a6a3f" opacity="0.8"/>
+    <ellipse cx="14" cy="-3" rx="3" ry="2" fill="#6a5a35" opacity="0.8"/>
+  </g>`;
+}
+
+function windowGrime(opacity: number) {
+  return `<rect x="26" y="30" width="58" height="44" fill="#5a5240" opacity="${opacity}" style="mix-blend-mode:multiply"/>`;
+}
+
 export function renderRoomSVG(opts: {
   username?: string;
   daysSinceLastCommit: number;
@@ -141,30 +278,147 @@ export function renderRoomSVG(opts: {
 }) {
   const days = Math.max(0, Math.floor(opts.daysSinceLastCommit));
   const room = getRoomState(days);
-  const p = PALETTE[room.stage];
+  const idx = room.stageIndex;
+  const p = getPalette(idx);
   const W = 320;
   const H = 220;
 
   let decor = "";
   let overlay = "";
-  let title = room.label;
+  const title = room.label;
 
-  if (room.stage === "clean") {
-    decor += sparkle(40, 30) + sparkle(260, 50) + sparkle(150, 20);
-  } else if (room.stage === "light") {
-    decor += crumpledPaper(70, 168, -8);
-    if (days === 2) decor += crumpledPaper(96, 172, 20);
-  } else if (room.stage === "moderate") {
-    decor += crumpledPaper(60, 168, -8) + crumpledPaper(84, 172, 14);
-    decor += trashBag(220, 150, 0.9);
-    overlay += dustLayer(0.08 + 0.02 * (days - 3));
-  } else {
-    decor += fullTrashCan(214, 150);
-    decor += cobweb(4, 4) + cobweb(W - 4, 4, true);
-    decor += smoke(228, 148);
-    overlay += dustLayer(0.16);
-    overlay += `<rect x="0" y="0" width="${W}" height="${H}" fill="#000000" opacity="0.28"/>`;
+  switch (room.stage) {
+    case "clean":
+      decor += sparkle(40, 30) + sparkle(260, 50) + sparkle(150, 20);
+      break;
+    case "light":
+      decor += crumpledPaper(70, 168, -8);
+      if (days === 2) decor += crumpledPaper(96, 172, 20);
+      break;
+    case "moderate":
+      decor += crumpledPaper(60, 168, -8) + crumpledPaper(84, 172, 14);
+      decor += trashBag(220, 150, 0.9);
+      break;
+    case "neglected":
+      decor += fullTrashCan(214, 150);
+      decor += cobweb(4, 4) + cobweb(W - 4, 4, true);
+      decor += smoke(228, 148);
+      break;
+    case "cluttered":
+      decor += fullTrashCan(214, 150);
+      decor += cobweb(4, 4) + cobweb(W - 4, 4, true);
+      decor += smoke(228, 148);
+      decor += clothesPile(100, 172);
+      overlay += windowGrime(0.15);
+      break;
+    case "infested":
+      decor += fullTrashCan(214, 150) + trashBag(56, 158, 0.7);
+      decor += cobweb(4, 4) + cobweb(W - 4, 4, true);
+      decor += smoke(228, 148);
+      decor += clothesPile(100, 172);
+      decor += fly(140, 60) + fly(160, 80) + fly(120, 100);
+      overlay += windowGrime(0.2);
+      break;
+    case "moldy":
+      decor += fullTrashCan(214, 150) + trashBag(56, 158, 0.7);
+      decor += cobweb(4, 4) + cobweb(W - 4, 4, true);
+      decor += smoke(228, 148);
+      decor += clothesPile(100, 172);
+      decor += fly(140, 60) + fly(160, 80) + fly(120, 100);
+      decor += moldSpot(250, 30, 0.8) + moldSpot(285, 95, 0.6);
+      overlay += windowGrime(0.28);
+      break;
+    case "gloomy":
+      decor += fullTrashCan(214, 150) + trashBag(56, 158, 0.7);
+      decor += cobweb(4, 4) + cobweb(W - 4, 4, true) + cobweb(105, 4, false, 0.6);
+      decor += smoke(228, 148);
+      decor += clothesPile(100, 172);
+      decor += fly(140, 60) + fly(160, 80) + fly(120, 100);
+      decor += moldSpot(250, 30, 0.8) + moldSpot(285, 95, 0.6);
+      overlay += windowGrime(0.42);
+      break;
+    case "abandoned":
+      decor += fullTrashCan(214, 150) + fullTrashCan(44, 150) + trashBag(56, 158, 0.7);
+      decor += cobweb(4, 4) + cobweb(W - 4, 4, true) + cobweb(105, 4, false, 0.6);
+      decor += smoke(228, 148) + smoke(58, 146);
+      decor += clothesPile(100, 172);
+      decor += fly(140, 60) + fly(160, 80) + fly(120, 100);
+      decor += moldSpot(250, 30, 0.8) + moldSpot(285, 95, 0.6);
+      overlay += windowGrime(0.5);
+      break;
+    case "cracked":
+      decor += fullTrashCan(214, 150) + fullTrashCan(44, 150) + trashBag(120, 160, 0.7);
+      decor += cobweb(4, 4) + cobweb(W - 4, 4, true) + cobweb(105, 4, false, 0.6);
+      decor += smoke(228, 148) + smoke(58, 146);
+      decor += clothesPile(150, 172);
+      decor += fly(140, 60) + fly(160, 80) + fly(120, 100) + fly(200, 70);
+      decor += moldSpot(250, 30, 0.8) + moldSpot(285, 95, 0.6);
+      decor += crack(112, 30) + crack(300, 60);
+      overlay += windowGrime(0.55);
+      break;
+    case "withered":
+      decor += fullTrashCan(214, 150) + fullTrashCan(44, 150) + trashBag(120, 160, 0.7);
+      decor += cobweb(4, 4) + cobweb(W - 4, 4, true) + cobweb(105, 4, false, 0.6);
+      decor += smoke(228, 148) + smoke(58, 146);
+      decor += clothesPile(150, 172);
+      decor += fly(140, 60) + fly(160, 80) + fly(120, 100) + fly(200, 70);
+      decor += moldSpot(250, 30, 0.8) + moldSpot(285, 95, 0.6);
+      decor += crack(112, 30) + crack(300, 60);
+      decor += witheredPlant(96, 146);
+      overlay += windowGrime(0.65);
+      break;
+    case "ruined":
+      decor += fullTrashCan(214, 150) + fullTrashCan(44, 150) + fullTrashCan(130, 155);
+      decor +=
+        cobweb(4, 4) +
+        cobweb(W - 4, 4, true) +
+        cobweb(105, 4, false, 0.6) +
+        cobweb(220, 4, true, 0.5);
+      decor += smoke(228, 148) + smoke(58, 146);
+      decor += fly(140, 60) + fly(160, 80) + fly(120, 100) + fly(200, 70) + fly(90, 55);
+      decor += moldSpot(250, 30, 0.8) + moldSpot(285, 95, 0.6) + moldSpot(30, 90, 0.5);
+      decor += crack(112, 30) + crack(300, 60) + crack(180, 20);
+      decor += witheredPlant(96, 146);
+      overlay += windowGrime(0.8);
+      break;
+    case "wasteland":
+      decor +=
+        fullTrashCan(214, 150) +
+        fullTrashCan(44, 150) +
+        fullTrashCan(130, 155) +
+        fullTrashCan(270, 158);
+      decor +=
+        cobweb(4, 4) +
+        cobweb(W - 4, 4, true) +
+        cobweb(105, 4, false, 0.6) +
+        cobweb(220, 4, true, 0.5);
+      decor += smoke(228, 148) + smoke(58, 146) + smoke(140, 150);
+      decor +=
+        fly(140, 60) + fly(160, 80) + fly(120, 100) + fly(200, 70) + fly(90, 55) + fly(240, 100);
+      decor += moldSpot(250, 30, 0.8) + moldSpot(285, 95, 0.6) + moldSpot(30, 90, 0.5);
+      decor += crack(112, 30) + crack(300, 60) + crack(180, 20);
+      decor += witheredPlant(96, 146);
+      decor += crumpledPaper(150, 165, 30) + crumpledPaper(180, 172, -20);
+      overlay += windowGrime(0.9);
+      break;
   }
+
+  if (DUST_OPACITY[idx] > 0) overlay += dustLayer(DUST_OPACITY[idx]);
+  if (DARK_OVERLAY_OPACITY[idx] > 0) {
+    overlay += `<rect x="0" y="0" width="${W}" height="${H}" fill="#000000" opacity="${DARK_OVERLAY_OPACITY[idx]}"/>`;
+  }
+
+  const glowOpacity = WINDOW_GLOW_OPACITY[idx];
+  // 20단계(moldy)부터는 "조명이 깜빡거린다"는 설정을 SVG 자체 애니메이션으로 표현
+  const flicker =
+    idx >= 6
+      ? `<animate attributeName="opacity" values="${glowOpacity};${glowOpacity * 0.25};${glowOpacity}" dur="2.2s" repeatCount="indefinite"/>`
+      : "";
+
+  const isDark = idx >= 3;
+  const textColor = isDark ? "#e8e2d5" : "#4a3826";
+  const subTextColor = isDark ? "#cfc8ba" : "#6a5640";
+  const screenColor = idx <= 1 ? "#7fd8ff" : "#3a4b52";
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Verdana, Geneva, sans-serif">
   <rect width="${W}" height="${H}" fill="${p.wall}"/>
@@ -177,14 +431,14 @@ export function renderRoomSVG(opts: {
   <rect x="26" y="30" width="58" height="44" fill="${p.window}"/>
   <rect x="53" y="30" width="4" height="44" fill="#5b4a36"/>
   <rect x="26" y="50" width="58" height="4" fill="#5b4a36"/>
-  <circle cx="70" cy="42" r="10" fill="${p.glow}" opacity="${room.stage === "clean" ? 0.9 : room.stage === "light" ? 0.5 : 0.25}"/>
+  <circle cx="70" cy="42" r="10" fill="${p.glow}" opacity="${glowOpacity}">${flicker}</circle>
 
   <!-- 책상 + 모니터 -->
   <rect x="150" y="128" width="120" height="10" fill="#8a5a34"/>
   <rect x="150" y="138" width="10" height="40" fill="#6d4526"/>
   <rect x="260" y="138" width="10" height="40" fill="#6d4526"/>
   <rect x="170" y="92" width="60" height="38" rx="3" fill="#2b2b2b"/>
-  <rect x="175" y="97" width="50" height="28" rx="2" fill="${room.stage === "clean" || room.stage === "light" ? "#7fd8ff" : "#3a4b52"}"/>
+  <rect x="175" y="97" width="50" height="28" rx="2" fill="${screenColor}"/>
   <rect x="195" y="130" width="10" height="8" fill="#2b2b2b"/>
   <rect x="185" y="138" width="30" height="4" fill="#1c1c1c"/>
 
@@ -196,8 +450,8 @@ export function renderRoomSVG(opts: {
   ${decor}
   ${overlay}
 
-  <text x="12" y="212" font-size="11" fill="${room.stage === "neglected" ? "#e8e2d5" : "#4a3826"}" opacity="0.85">${opts.username ? "@" + escapeXml(opts.username) + " · " : ""}${title} ${room.emoji}</text>
-  <text x="${W - 10}" y="212" font-size="10" fill="${room.stage === "neglected" ? "#cfc8ba" : "#6a5640"}" text-anchor="end" opacity="0.75">${days === 0 ? "오늘 커밋함" : days + "일째 미커밋"}</text>
+  <text x="12" y="212" font-size="11" fill="${textColor}" opacity="0.85">${opts.username ? "@" + escapeXml(opts.username) + " · " : ""}${title} ${room.emoji}</text>
+  <text x="${W - 10}" y="212" font-size="10" fill="${subTextColor}" text-anchor="end" opacity="0.75">${days === 0 ? "오늘 커밋함" : days + "일째 미커밋"}</text>
 </svg>`;
 
   return { svg, room };
