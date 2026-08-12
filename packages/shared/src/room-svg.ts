@@ -5,6 +5,17 @@
 // 3~5일: 쓰레기봉투 + 얇은 먼지
 // 7일+ : 거미줄 + 꽉 찬 쓰레기통 + 어두운 방 + 연기
 
+// 사용자 입력(username)이 SVG <text> 노드에 그대로 들어가므로 XML 특수문자를 escape.
+// (/api/room?user= 는 인증 없이 임의 문자열을 그대로 받는 공개 엔드포인트)
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
 export type RoomStage = "clean" | "light" | "moderate" | "neglected";
 
 export interface RoomState {
@@ -185,7 +196,7 @@ export function renderRoomSVG(opts: {
   ${decor}
   ${overlay}
 
-  <text x="12" y="212" font-size="11" fill="${room.stage === "neglected" ? "#e8e2d5" : "#4a3826"}" opacity="0.85">${opts.username ? "@" + opts.username + " · " : ""}${title} ${room.emoji}</text>
+  <text x="12" y="212" font-size="11" fill="${room.stage === "neglected" ? "#e8e2d5" : "#4a3826"}" opacity="0.85">${opts.username ? "@" + escapeXml(opts.username) + " · " : ""}${title} ${room.emoji}</text>
   <text x="${W - 10}" y="212" font-size="10" fill="${room.stage === "neglected" ? "#cfc8ba" : "#6a5640"}" text-anchor="end" opacity="0.75">${days === 0 ? "오늘 커밋함" : days + "일째 미커밋"}</text>
 </svg>`;
 
