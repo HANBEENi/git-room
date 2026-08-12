@@ -1,0 +1,52 @@
+name: 🐛 버그 리포트
+description: 기능이 의도대로 동작하지 않는 경우
+labels: ["type: bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 무슨 일이 있었나요?
+      description: 어떤 버그인지 설명해주세요.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 재현 방법
+      description: 버그를 재현하는 순서를 단계별로 적어주세요.
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대한 동작
+    validations:
+      required: false
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 어디서 발생했나요?
+      options:
+        - web
+        - mobile
+        - shared
+        - 기타
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 추가 정보 (스크린샷, 로그 등)
+      description: >
+        이 이슈는 누구나 볼 수 있는 공개 게시물입니다. 업로드 전에 토큰, 비밀번호,
+        개인정보 등 민감한 정보가 포함되어 있지 않은지 확인해주세요.
+    validations:
+      required: false
