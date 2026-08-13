@@ -84,6 +84,32 @@ export function getRoomState(daysSinceLastCommit: number): RoomState {
   };
 }
 
+// 시간대/계절 — 창밖 풍경에만 영향을 준다 (방치 단계는 그대로 wall/floor 톤을 좌우함).
+// /api/room은 인증 없는 이미지 요청이라 "요청자가 사는 시간대"를 서버가 알 수 없어서,
+// 기본값은 서버 시각(now 인자를 안 넘기면 new Date())을 쓴다. 나중에 로그인된
+// 대시보드/모바일에서 클라이언트의 실제 로컬 시간을 넘겨주면 그 사람 기준으로 정확해진다.
+export type TimeOfDay = "dawn" | "morning" | "day" | "sunset" | "night";
+
+export function getTimeOfDay(now: Date = new Date()): TimeOfDay {
+  const hour = now.getHours();
+  if (hour >= 5 && hour < 7) return "dawn";
+  if (hour >= 7 && hour < 11) return "morning";
+  if (hour >= 11 && hour < 17) return "day";
+  if (hour >= 17 && hour < 20) return "sunset";
+  return "night";
+}
+
+// 북반구(한국 등) 기준. 남반구 대응은 위치 정보가 필요해서 이번 범위에는 포함하지 않음.
+export type Season = "spring" | "summer" | "fall" | "winter";
+
+export function getSeason(now: Date = new Date()): Season {
+  const month = now.getMonth() + 1;
+  if (month >= 3 && month <= 5) return "spring";
+  if (month >= 6 && month <= 8) return "summer";
+  if (month >= 9 && month <= 11) return "fall";
+  return "winter";
+}
+
 interface Palette {
   wall: string;
   wallShade: string;
@@ -271,15 +297,137 @@ function windowGrime(opacity: number) {
   return `<rect x="26" y="30" width="58" height="44" fill="#5a5240" opacity="${opacity}" style="mix-blend-mode:multiply"/>`;
 }
 
+interface SkyTheme {
+  top: string;
+  bottom: string;
+  celestial: "sun" | "moon" | null;
+  showStars: boolean;
+}
+
+const SKY_THEMES: Record<TimeOfDay, SkyTheme> = {
+  dawn: { top: "#f6b98c", bottom: "#ffe3b0", celestial: "sun", showStars: false },
+  morning: { top: "#bfe8ff", bottom: "#eaf7ff", celestial: "sun", showStars: false },
+  day: { top: "#8fd3ff", bottom: "#d8f1ff", celestial: "sun", showStars: false },
+  sunset: { top: "#7d5aa6", bottom: "#f2905c", celestial: "sun", showStars: false },
+  night: { top: "#0c1830", bottom: "#1f2f4d", celestial: "moon", showStars: true },
+};
+
+// 계절별로 창밖 하단에 살짝 보이는 풍경 실루엣. mixT(0=선명, 1=거의 안 보임)만큼 옅어진다.
+const SEASON_WINDOW_SCENERY: Record<Season, (mixT: number) => string> = {
+  spring: (t) => `<g opacity="${1 - t * 0.7}">
+    <circle cx="34" cy="66" r="2" fill="#ffc2d6"/>
+    <circle cx="40" cy="70" r="1.6" fill="#ffd6e6"/>
+    <circle cx="46" cy="64" r="1.8" fill="#ffc2d6"/>
+    <circle cx="60" cy="68" r="2" fill="#ffd6e6"/>
+    <circle cx="68" cy="63" r="1.6" fill="#ffc2d6"/>
+  </g>`,
+  summer: (t) =>
+    `<path d="M26 74 Q40 54 55 74 Z" fill="${mixHex("#3f7d3a", "#000000", t * 0.5)}" opacity="${1 - t * 0.5}"/>`,
+  fall: (t) =>
+    `<path d="M26 74 Q40 56 55 74 Z" fill="${mixHex("#c97a34", "#000000", t * 0.5)}" opacity="${1 - t * 0.5}"/>`,
+  winter: (t) => `<g opacity="${1 - t * 0.4}">
+    <path d="M26 70 Q40 62 55 70 L55 74 L26 74 Z" fill="#f4f8ff"/>
+    <circle cx="36" cy="40" r="1" fill="#ffffff"/>
+    <circle cx="50" cy="46" r="1" fill="#ffffff"/>
+    <circle cx="64" cy="38" r="1" fill="#ffffff"/>
+  </g>`,
+};
+
+let windowSkyGradientCounter = 0;
+
+/** 창문 안쪽에 시간대(하늘색+해/달/별)와 계절(풍경 실루엣)을 겹쳐 그린 레이어. */
+function windowSkyLayer(time: TimeOfDay, season: Season, mixT: number, flicker: string) {
+  const theme = SKY_THEMES[time];
+  const top = mixHex(theme.top, "#242220", mixT);
+  const bottom = mixHex(theme.bottom, "#242220", mixT);
+  const gradientId = `skyGradient${windowSkyGradientCounter++}`;
+
+  const stars = theme.showStars
+    ? [
+        [32, 36],
+        [40, 44],
+        [50, 34],
+        [60, 40],
+        [70, 38],
+        [78, 46],
+      ]
+        .map(
+          ([sx, sy]) =>
+            `<circle cx="${sx}" cy="${sy}" r="0.8" fill="#ffffff" opacity="${0.8 * (1 - mixT)}"/>`,
+        )
+        .join("")
+    : "";
+
+  const celestial =
+    theme.celestial === "sun"
+      ? `<circle cx="70" cy="42" r="7" fill="#fff3c4" opacity="${1 - mixT}">${flicker}</circle>`
+      : theme.celestial === "moon"
+        ? `<g opacity="${1 - mixT}"><circle cx="70" cy="40" r="6" fill="#f4f1e6">${flicker}</circle><circle cx="72" cy="38" r="1.4" fill="#d8d4c4" opacity="0.6"/></g>`
+        : "";
+
+  return `<defs>
+    <clipPath id="${gradientId}Clip"><rect x="26" y="30" width="58" height="44"/></clipPath>
+    <linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${top}"/>
+      <stop offset="100%" stop-color="${bottom}"/>
+    </linearGradient>
+  </defs>
+  <g clip-path="url(#${gradientId}Clip)">
+    <rect x="26" y="30" width="58" height="44" fill="url(#${gradientId})"/>
+    ${stars}
+    ${celestial}
+    ${SEASON_WINDOW_SCENERY[season](mixT)}
+  </g>`;
+}
+
+function flowerPot(x: number, y: number) {
+  return `<g transform="translate(${x} ${y})">
+    <path d="M4 20 L20 20 L18 8 L6 8 Z" fill="#a8562e"/>
+    <path d="M12 8 Q6 -2 8 -10" stroke="#4a7a3a" stroke-width="2" fill="none"/>
+    <path d="M12 8 Q18 -4 14 -12" stroke="#4a7a3a" stroke-width="2" fill="none"/>
+    <circle cx="8" cy="-11" r="3" fill="#ffc2d6"/>
+    <circle cx="14" cy="-13" r="2.6" fill="#ffb0cc"/>
+  </g>`;
+}
+
+function fanUnit(x: number, y: number) {
+  return `<g transform="translate(${x} ${y})">
+    <rect x="0" y="10" width="4" height="20" fill="#888888"/>
+    <circle cx="2" cy="6" r="10" fill="#e6e6e6" stroke="#b0b0b0" stroke-width="1"/>
+    <path d="M2 6 L2 -1 M2 6 L8 9 M2 6 L-4 9" stroke="#b0b0b0" stroke-width="1.4"/>
+  </g>`;
+}
+
+function kotatsu(x: number, y: number) {
+  return `<g transform="translate(${x} ${y})">
+    <rect x="0" y="10" width="30" height="6" fill="#8a4a2e"/>
+    <rect x="4" y="16" width="4" height="10" fill="#5a3220"/>
+    <rect x="22" y="16" width="4" height="10" fill="#5a3220"/>
+    <rect x="-2" y="4" width="34" height="8" rx="2" fill="#c94a3a"/>
+  </g>`;
+}
+
+/** 계절별 실내 소품 하나 (화분/선풍기/코타츠). 가을은 조명 톤만 바뀌고 별도 소품 없음. */
+function seasonProp(season: Season, x: number, y: number): string {
+  if (season === "spring") return flowerPot(x, y);
+  if (season === "summer") return fanUnit(x, y);
+  if (season === "winter") return kotatsu(x, y);
+  return "";
+}
+
 export function renderRoomSVG(opts: {
   username?: string;
   daysSinceLastCommit: number;
   currentStreak?: number;
+  /** 시간대/계절 계산 기준 시각. 생략하면 서버 시각(new Date())을 쓴다. */
+  now?: Date;
 }) {
   const days = Math.max(0, Math.floor(opts.daysSinceLastCommit));
   const room = getRoomState(days);
   const idx = room.stageIndex;
   const p = getPalette(idx);
+  const timeOfDay = getTimeOfDay(opts.now);
+  const season = getSeason(opts.now);
   const W = 320;
   const H = 220;
 
@@ -408,12 +556,17 @@ export function renderRoomSVG(opts: {
     overlay += `<rect x="0" y="0" width="${W}" height="${H}" fill="#000000" opacity="${DARK_OVERLAY_OPACITY[idx]}"/>`;
   }
 
+  decor += seasonProp(season, 98, 140);
+
   const glowOpacity = WINDOW_GLOW_OPACITY[idx];
-  // 20단계(moldy)부터는 "조명이 깜빡거린다"는 설정을 SVG 자체 애니메이션으로 표현
+  // 06단계(moldy)부터는 "조명이 깜빡거린다"는 설정을 SVG 자체 애니메이션으로 표현
   const flicker =
     idx >= 6
-      ? `<animate attributeName="opacity" values="${glowOpacity};${glowOpacity * 0.25};${glowOpacity}" dur="2.2s" repeatCount="indefinite"/>`
+      ? `<animate attributeName="opacity" values="1;0.25;1" dur="2.2s" repeatCount="indefinite"/>`
       : "";
+  // 방치 단계가 깊을수록 창밖 하늘도 점점 칙칙해진다 (glowOpacity가 낮을수록 mixT가 커짐)
+  const skyMixT = 1 - glowOpacity / WINDOW_GLOW_OPACITY[0];
+  const skyLayer = windowSkyLayer(timeOfDay, season, skyMixT, flicker);
 
   const isDark = idx >= 3;
   const textColor = isDark ? "#e8e2d5" : "#4a3826";
@@ -428,10 +581,9 @@ export function renderRoomSVG(opts: {
 
   <!-- 창문 -->
   <rect x="20" y="24" width="70" height="56" rx="4" fill="#5b4a36"/>
-  <rect x="26" y="30" width="58" height="44" fill="${p.window}"/>
+  ${skyLayer}
   <rect x="53" y="30" width="4" height="44" fill="#5b4a36"/>
   <rect x="26" y="50" width="58" height="4" fill="#5b4a36"/>
-  <circle cx="70" cy="42" r="10" fill="${p.glow}" opacity="${glowOpacity}">${flicker}</circle>
 
   <!-- 책상 + 모니터 -->
   <rect x="150" y="128" width="120" height="10" fill="#8a5a34"/>
